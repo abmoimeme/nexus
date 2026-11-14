@@ -171,7 +171,22 @@ test('account password change and email reset', async () => {
   assert.equal((await post('/api/auth/forgot', { email: 'not-an-email' })).status, 400);
 });
 
-test('server-only admin routes are cleanly unavailable', async () => {
+test('owner access comes only from an admins/{uid} document; owners can list people and email reset links', async () => {
+  await signUp('owner@x.co', 'Owner One'); await post('/api/auth/logout'); await signUp('friend@x.co', 'Friend Two');
+  let s = await get('/api/session'); assert.equal(s.user.isAdmin, false); assert.equal(s.hosted, true);
+  for (const p of ['/api/users', '/api/sources', '/api/settings']) assert.equal((await get(p)).status, 403, p);
+  assert.equal((await post(`/api/users/${s.user.id}/password`)).status, 403);
+  await post('/api/auth/logout'); await post('/api/auth/login', { email: 'owner@x.co', password: 'secret-pass-1' });
+  s = await get('/api/session'); fake.db.set(`admins/${s.user.id}`, { role: 'owner' });
+  s = await get('/api/session'); assert.equal(s.user.isAdmin, true);
+  const { users } = await get('/api/users'); assert.deepEqual(users.map((u) => u.email).sort(), ['friend@x.co', 'owner@x.co']);
+  const friend = users.find((u) => u.email === 'friend@x.co');
+  const r = await post(`/api/users/${friend.id}/password`); assert.equal(r.emailed, true); assert.equal(fake.sendPasswordResetEmail.sent.slice(-1)[0], 'friend@x.co');
+  assert.equal((await post('/api/users/nobody/password')).status, 404);
+  assert.deepEqual((await get('/api/sources')).sources, []);
+});
+
+test('unknown routes are cleanly unavailable', async () => {
   await signUp(); await pick('Abdoul');
-  const r = await get('/api/sources'); assert.equal(r.status, 404); assert.match(r.error, /no media-server admin/);
+  const r = await post('/api/sources/plex/pin'); assert.equal(r.status, 404); assert.match(r.error, /no media-server admin/);
 });

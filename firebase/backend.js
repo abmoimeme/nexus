@@ -57,6 +57,8 @@ const mapErr = (e) => {
   return new HttpError(500, e?.message || 'Something went wrong');
 };
 
+const isOwner = async (u) => { try { return (await sdk.getDoc(sdk.doc(db, 'admins', u.uid))).exists(); } catch { return false; } };
+const needAdmin = async () => { const u = need(); if (!(await isOwner(u))) throw new HttpError(403, 'Owner access required'); return u; };
 const need = () => { if (!auth.currentUser) throw new HttpError(401, 'Please sign in'); return auth.currentUser; };
 const uref = (u) => sdk.doc(db, 'users', u.uid);
 const pcol = (u) => sdk.collection(db, 'users', u.uid, 'profiles');
@@ -128,8 +130,8 @@ async function route(method, path, q, body) {
   if (path === '/api/session') {
     const u = auth.currentUser; let profile = null;
     if (u) { const pid = sess(`nexus_p_${u.uid}`); if (pid) profile = await getProfile(u, pid).then((p) => pub(pid, p)).catch(() => null); }
-    return { user: u ? { id: u.uid, name: u.displayName || (u.email || '').split('@')[0], email: u.email, isAdmin: false } : null, profile,
-      setupNeeded: false, signupOpen: true, canReset: true, avatars: AVATARS, maxProfiles: MAX_PROFILES };
+    return { user: u ? { id: u.uid, name: u.displayName || (u.email || '').split('@')[0], email: u.email, isAdmin: await isOwner(u) } : null, profile,
+      setupNeeded: false, signupOpen: true, canReset: true, hosted: true, avatars: AVATARS, maxProfiles: MAX_PROFILES };
   }
   if (path === '/api/auth/register') {
     const name = String(body.name || '').trim().slice(0, 60); const email = String(body.email || '').trim();
@@ -248,6 +250,16 @@ async function route(method, path, q, body) {
   if ((m = /^\/api\/progress\/(\d+)$/.exec(path)) && method === 'DELETE') {
     const c = await load(need()); P.progress.delete(Number(m[1]));
     await sdk.deleteDoc(sdk.doc(db, 'users', c.u.uid, 'profiles', c.pid, 'progress', m[1])); return { ok: true };
+  }
+  if (path === '/api/sources') { await needAdmin(); return { sources: [] }; }
+  if (path === '/api/settings') { await needAdmin(); return { openSignup: true }; }
+  if (path === '/api/users') {
+    const me = await needAdmin(); const snap = await sdk.getDocs(sdk.collection(db, 'users'));
+    return { users: snap.docs.map((d) => ({ id: d.id, name: d.data().name, email: d.data().email, isAdmin: d.id === me.uid })).sort((a, b) => String(a.name).localeCompare(String(b.name))) };
+  }
+  if ((m = /^\/api\/users\/([^/]+)\/password$/.exec(path))) {
+    await needAdmin(); const snap = await sdk.getDoc(sdk.doc(db, 'users', m[1])); if (!snap.exists()) throw new HttpError(404, 'Account not found');
+    await sdk.sendPasswordResetEmail(auth, snap.data().email); return { email: snap.data().email, emailed: true };
   }
   throw new HttpError(404, 'This build of NEXUS has no media-server admin. Titles come from the built-in catalog.');
 }

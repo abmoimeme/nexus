@@ -592,13 +592,13 @@ async function viewSources() {
       ${s.via === 'relay' ? '<span class="st relay" title="Connected through Plex Relay, which Plex limits to low bitrates. Enable Remote Access on the server for HD.">Relay · limited quality</span>' : ''}<span class="st ${esc(s.status)}">${esc(s.status === 'ok' ? 'Ready' : s.status)}</span>
       ${s.syncable ? `<button class="btn btn-ghost btn-sm" data-act="syncsrc" data-id="${s.id}">Sync</button>` : ''}
       <button class="btn btn-danger btn-sm" data-act="rmsrc" data-id="${s.id}" data-name="${esc(s.name)}">Remove</button></div>`).join('') : '<p class="hint">Nothing connected yet.</p>'}</div>
-    <div class="sect"><h3>Add titles</h3><div class="addgrid">
+    ${S.session.hosted ? '<p class="hint">This version of NEXUS uses its built-in catalog. Connecting Plex and importing from other sources needs the NEXUS server.</p>' : `<div class="sect"><h3>Add titles</h3><div class="addgrid">
       <button class="addcard" data-act="addplex"><div class="ic">▶</div><b>Plex server</b><span>Sign in with Plex or enter your server address. Your local or remote library, with posters and episodes.</span></button>
       <button class="addcard" data-act="addarchive"><div class="ic">🏛</div><b>Internet Archive</b><span>Import free public-domain feature films. Plays straight from archive.org.</span></button>
-      <button class="addcard" data-act="addlink"><div class="ic">🔗</div><b>Video link</b><span>Add a single title from an MP4, WebM or HLS (.m3u8) URL you are allowed to stream.</span></button></div></div>
-    <div class="sect"><h3>Access</h3><label class="switch"><span>Allow others to create accounts<br><small class="hint">Off by default. Turn on briefly to let family or testers sign up, then switch it off.</small></span><input type="checkbox" data-change="signup" ${st.openSignup ? 'checked' : ''}></label>
+      <button class="addcard" data-act="addlink"><div class="ic">🔗</div><b>Video link</b><span>Add a single title from an MP4, WebM or HLS (.m3u8) URL you are allowed to stream.</span></button></div></div>`}
+    <div class="sect"><h3>Access</h3>${S.session.hosted ? '' : `<label class="switch"><span>Allow others to create accounts<br><small class="hint">Off by default. Turn on briefly to let family or testers sign up, then switch it off.</small></span><input type="checkbox" data-change="signup" ${st.openSignup ? 'checked' : ''}></label>`}
       <h3 style="margin-top:18px">People with an account</h3>
-      ${users.map((u) => `<div class="src"><div class="ic">👤</div><div class="i"><b>${esc(u.name)}</b><span>${esc(u.email)}${u.isAdmin ? ' · Owner' : ''}</span></div>${u.id !== S.session.user.id ? `<button class="btn btn-ghost btn-sm" data-act="resetpw" data-id="${u.id}" data-name="${esc(u.name)}">Reset password</button>` : ''}</div>`).join('')}</div></div>`;
+      ${users.map((u) => `<div class="src"><div class="ic">👤</div><div class="i"><b>${esc(u.name)}</b><span>${esc(u.email)}${u.isAdmin ? ' · Owner' : ''}</span></div>${u.id !== S.session.user.id ? `<button class="btn btn-ghost btn-sm" data-act="resetpw" data-id="${u.id}" data-name="${esc(u.name)}">${S.session.hosted ? 'Email reset link' : 'Reset password'}</button>` : ''}</div>`).join('')}</div></div>`;
   if (src.some((s) => s.status === 'syncing')) S.poll = setInterval(() => { if (S.route === 'sources' && !modalRoot.innerHTML) viewSources(); }, 3000);
 }
 
@@ -724,9 +724,10 @@ const A = {
   help: () => { $('.menu')?.remove(); helpModal(); },
   chpw: () => { $('.menu')?.remove(); changePwModal(); },
   resetpw: async (el) => {
-    if (!confirm(i18n.t(`Reset the password for ${el.dataset.name}? They will be signed out everywhere.`))) return;
+    if (!confirm(i18n.t(S.session.hosted ? `Email a password-reset link to ${el.dataset.name}?` : `Reset the password for ${el.dataset.name}? They will be signed out everywhere.`))) return;
     try {
       const r = await api(`/api/users/${el.dataset.id}/password`, { method: 'POST', body: {} });
+      if (r.emailed) { toast(`A password-reset link was emailed to ${r.email}`); return; }
       openModal(`<h2>Temporary password</h2><p class="hint" style="margin-bottom:12px">Share this with ${esc(el.dataset.name)} privately. It is shown only once — they should change it from their profile menu after signing in.</p>
         <div class="field"><span>${esc(r.email)}</span><input id="tmp" readonly value="${esc(r.temporaryPassword)}"></div>
         <div class="row"><button class="btn btn-ghost" data-act="copytmp">Copy</button><button class="btn btn-primary" data-act="closemodal">Done</button></div>`);

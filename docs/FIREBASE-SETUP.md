@@ -17,3 +17,10 @@ Until step 1 is done the site automatically shows that demo.
 - Titles come from `catalog.json` (sample titles) and play the built-in clip. A catalog entry can carry `streamUrl` (mp4 or m3u8) to play real files.
 - Plex, Internet Archive import and the owner admin screens need the Node server (see README); they report "not available" here.
 - Kids profiles and PINs are household controls enforced in the app, not a defence against the account owner, who can change them with the account password.
+
+## Owner / admin access
+The owner is whoever has a document `admins/{their uid}` in Firestore (no client can create it, so nobody can promote themselves).
+1. Create your account in the app (Create account), then copy your **User UID** from Firebase console → Authentication → Users.
+2. Firestore Database → Start collection `admins` → Document ID = that UID → add one field, e.g. `role` = `owner` → Save.
+3. Reload NEXUS. The "Libraries & sources" page now lists everyone with an account and can email them a password-reset link.
+Re-publish the rules after pulling updates: `npx firebase-tools deploy --only firestore:rules --project nexus-9f372`.

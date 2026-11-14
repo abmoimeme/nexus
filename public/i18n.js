@@ -3,6 +3,7 @@
 const FR = {
   'Forgot password?': 'Mot de passe oublié ?', 'Type your email above first': "Saisissez d'abord votre e-mail ci-dessus",
   'If that email has an account, a reset link is on its way. Check your spam folder too.': 'Si cet e-mail a un compte, un lien de réinitialisation est en route. Vérifiez aussi vos courriers indésirables.',
+  'Email reset link': 'Envoyer un lien de réinitialisation',
   'Sign in': 'Se connecter', 'Create account': 'Créer un compte', 'Welcome back': 'Bon retour',
   'Welcome — set up NEXUS': 'Bienvenue — configurez NEXUS',
   'Create the owner account. You will connect your media servers next.': 'Créez le compte propriétaire. Vous connecterez ensuite vos serveurs multimédias.',
