@@ -4,6 +4,8 @@
 name: Deploy demo to Firebase Hosting
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '17 9 * * 1'   # refresh the film list weekly
   push:
     branches: [main]
     paths: ['public/**', 'demo/**', 'scripts/**', 'firebase/**', 'firebase.json', 'package.json']
@@ -16,6 +18,9 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
+      # Pull the current free-film list from archive.org; if it is unreachable the site keeps the last/sample titles.
+      - run: npm run import:archive
+        continue-on-error: true
       - run: npm run build:site
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
