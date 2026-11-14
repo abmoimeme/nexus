@@ -89,6 +89,7 @@ function renderAuth(mode) {
         <label class="field"><span>Password${reg ? ' (8+ characters)' : ''}</span><input name="password" type="password" required minlength="${reg ? 8 : 1}" autocomplete="${reg ? 'new-password' : 'current-password'}"></label>
         <div class="err" id="autherr" role="alert"></div>
         <button class="btn btn-primary" style="width:100%" type="submit">${reg ? 'Create account' : 'Sign in'}</button>
+        ${!reg && s.canReset ? '<button type="button" class="btn btn-ghost btn-sm" data-act="forgotpw" style="margin-top:10px">Forgot password?</button>' : ''}
       </form>
     </div>
     <button class="btn btn-ghost btn-sm" data-act="lang" style="margin-top:18px">English / Français</button></div>`;
@@ -686,6 +687,11 @@ const A = {
   lang: () => { i18n.toggle(); },
   overlay: (el, e) => { if (e.target === el) closeModal(); },
   closemodal: closeModal,
+  forgotpw: async () => {
+    const email = $('input[name=email]')?.value.trim();
+    if (!email) { $('#autherr').textContent = i18n.t('Type your email above first'); return; }
+    try { await api('/api/auth/forgot', { method: 'POST', body: { email } }); $('#autherr').textContent = ''; toast('If that email has an account, a reset link is on its way. Check your spam folder too.'); } catch (e) { fail(e); }
+  },
   authtab: (el) => renderAuth(el.dataset.m),
   logout: async () => { try { await api('/api/auth/logout', { method: 'POST', body: {} }); } catch { /* ignore */ } S.managing = false; $('.menu')?.remove(); boot(); },
   togglemanage: () => { S.managing = !S.managing; renderProfiles(); },
