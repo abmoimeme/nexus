@@ -1,0 +1,27 @@
+services:
+  nexus:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - nexus-data:/data
+    environment:
+      # true when NEXUS sits behind HTTPS (Cloudflare Tunnel, Caddy, nginx...). Required for the share link below.
+      TRUST_PROXY: "${TRUST_PROXY:-false}"
+      # Optional: your own 32+ character secret for encrypting stored Plex tokens.
+      NEXUS_SECRET: "${NEXUS_SECRET:-}"
+
+  # Temporary public HTTPS test link, no Cloudflare account needed:
+  #   TRUST_PROXY=true docker compose --profile share up -d --build
+  #   docker compose logs tunnel | grep trycloudflare.com
+  tunnel:
+    profiles: ["share"]
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --url http://nexus:8080
+    depends_on:
+      - nexus
+
+volumes:
+  nexus-data:

@@ -1,0 +1,6 @@
+data/
+node_modules/
+.env
+*.log
+hosting/
+demo/nexus-demo.html

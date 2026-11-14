@@ -1,0 +1,16 @@
+{
+  "name": "nexus-streaming",
+  "version": "1.0.0",
+  "description": "NEXUS \u2014 a premium self-hosted streaming front end for Plex and other media sources",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server/index.js",
+    "test": "node --disable-warning=ExperimentalWarning --test tests/e2e.test.js",
+    "cli": "node --disable-warning=ExperimentalWarning server/cli.js",
+    "build:demo": "node scripts/build-demo.mjs && mkdir -p hosting && cp demo/nexus-demo.html hosting/index.html"
+  }
+}

@@ -1,0 +1,23 @@
+# Publishes the static NEXUS demo (sample titles, no backend) to Firebase Hosting on every push to main.
+# One-time setup: in Firebase run `firebase init hosting:github` (it creates the secret), or add the repo secret
+# FIREBASE_SERVICE_ACCOUNT yourself and replace YOUR_FIREBASE_PROJECT_ID below.
+name: Deploy demo to Firebase Hosting
+on:
+  push:
+    branches: [main]
+    paths: ['public/**', 'demo/**', 'scripts/**', 'firebase.json']
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm run build:demo
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: YOUR_FIREBASE_PROJECT_ID
+          channelId: live
