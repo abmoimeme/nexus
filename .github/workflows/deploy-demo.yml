@@ -3,6 +3,7 @@
 # FIREBASE_SERVICE_ACCOUNT_NEXUS_9F372 yourself.
 name: Deploy demo to Firebase Hosting
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths: ['public/**', 'demo/**', 'scripts/**', 'firebase.json']
