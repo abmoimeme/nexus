@@ -17,7 +17,7 @@ git push -u origin main
 
 ## Step 2 — Firebase demo link (free, permanent)
 1. Create (or reuse) a Firebase project; note its **project ID**.
-2. Replace `YOUR_FIREBASE_PROJECT_ID` in `.firebaserc` and `.github/workflows/deploy-demo.yml`.
+2. Project ID `nexus-9f372` is already set in `.firebaserc` and `.github/workflows/deploy-demo.yml`.
 3. Run `firebase init hosting:github` once (choose this repo, keep `hosting` as the public folder, do not overwrite files). It stores the deploy secret in GitHub.
 4. Push to `main` → the demo is live at `https://<project-id>.web.app`.
 

@@ -1,6 +1,6 @@
 # Publishes the static NEXUS demo (sample titles, no backend) to Firebase Hosting on every push to main.
 # One-time setup: in Firebase run `firebase init hosting:github` (it creates the secret), or add the repo secret
-# FIREBASE_SERVICE_ACCOUNT yourself and replace YOUR_FIREBASE_PROJECT_ID below.
+# FIREBASE_SERVICE_ACCOUNT yourself and replace nexus-9f372 below.
 name: Deploy demo to Firebase Hosting
 on:
   push:
@@ -19,5 +19,5 @@ jobs:
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          projectId: YOUR_FIREBASE_PROJECT_ID
+          projectId: nexus-9f372
           channelId: live
