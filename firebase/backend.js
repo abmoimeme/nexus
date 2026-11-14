@@ -46,6 +46,7 @@ const AUTH_ERRORS = {
   'auth/invalid-email': [400, 'That email address does not look right'], 'auth/email-already-in-use': [409, 'An account with this email already exists'],
   'auth/weak-password': [400, 'Choose a password of at least 8 characters'], 'auth/too-many-requests': [429, 'Too many attempts. Try again in a few minutes.'],
   'auth/network-request-failed': [503, 'No connection. Check your internet and try again.'], 'auth/operation-not-allowed': [503, 'Email sign-in is not switched on for this project yet.'],
+  'auth/configuration-not-found': [503, 'Sign-in is not switched on for this project yet. The owner needs to enable Email/Password in Firebase Authentication.'],
   'auth/requires-recent-login': [401, 'Please sign in again, then retry'],
 };
 const mapErr = (e) => {
