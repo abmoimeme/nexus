@@ -31,3 +31,17 @@ When enabled in the deploy workflow (currently switched off, so the site shows t
 - Change the list with `ARCHIVE_QUERY` / `ARCHIVE_LIMIT` (see `scripts/import-archive.mjs`).
 - Archive films are unrated, so Kids profiles do not show them.
 - The fictional sample titles remain at `/demo.html`.
+
+## Invite-only sign-up
+
+Nobody can create an account without an invite code. A code lives in Firestore as `invites/{CODE}` with fields
+`email` (optional, lowercase; if set, only that email can use it), `maxUses` (number) and `uses` (number, starts at 0).
+
+- **From the app (owner):** Libraries & sources -> Invites -> type their email (or leave blank for a shared code) -> Create invite.
+  The link (`https://nexus-9f372.web.app/?invite=CODE`) is copied; send it. The code is pre-filled on the sign-up form.
+- **By hand (fallback):** Firebase console -> Firestore -> Start collection `invites` -> Document ID like `NX-FAMILY2026`
+  (UPPERCASE letters, digits, dashes) with fields `email` (string, may be empty), `maxUses` (number), `uses` (number 0).
+- Sign-up uses the code in the same write that creates the account record, and the rules enforce it, so a bad, used-up or
+  wrong-email code is refused and the half-made login is deleted.
+- Deploy the rules after pulling: `npx firebase-tools deploy --only firestore:rules --project nexus-9f372`.
+- An invite proves the email is the one you intended, but NEXUS does not verify the person owns it (no confirmation email yet).

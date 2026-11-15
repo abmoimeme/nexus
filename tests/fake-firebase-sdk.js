@@ -4,12 +4,14 @@ export const users = new Map();        // email -> { uid, password, displayName 
 let uid = 0;
 const fail = (code) => Object.assign(new Error(code), { code });
 const A = { currentUser: null, authStateReady: async () => {} };
-export const resetFake = () => { db.clear(); users.clear(); A.currentUser = null; };
+export const resetFake = () => { fakeDeleted.length = 0; db.clear(); users.clear(); A.currentUser = null; };
 
 export const initializeApp = (cfg) => ({ cfg });
 export const getAuth = () => A;
 export const getFirestore = () => ({ db });
-const mk = (email, u) => ({ uid: u.uid, email, get displayName() { return u.displayName; }, _u: u });
+const mk = (email, u) => ({ uid: u.uid, email, get displayName() { return u.displayName; }, _u: u,
+  delete: async () => { users.delete(email); if (A.currentUser?.uid === u.uid) A.currentUser = null; fakeDeleted.push(email); } });
+export const fakeDeleted = [];
 export async function createUserWithEmailAndPassword(_a, email, password) {
   if (!/^[^@\s]+@[^@\s]+$/.test(email)) throw fail('auth/invalid-email');
   if (password.length < 6) throw fail('auth/weak-password');
@@ -39,6 +41,30 @@ export const getDocs = async (c) => {
   return { docs: [...db.keys()].filter((k) => k.startsWith(`${c.path}/`) && k.split('/').length === depth).map((k) => snap(k, db.get(k))) };
 };
 export const setDoc = async (ref, data) => { db.set(ref.path, structuredClone(data)); };
-export const updateDoc = async (ref, patch) => { if (!db.has(ref.path)) throw fail('not-found'); db.set(ref.path, { ...db.get(ref.path), ...patch }); };
+export const increment = (n) => ({ __inc: n });
+const applyPatch = (old, patch) => { const out = { ...old }; for (const [k, v] of Object.entries(patch)) out[k] = v && v.__inc !== undefined ? (out[k] || 0) + v.__inc : v; return out; };
+export const updateDoc = async (ref, patch) => { if (!db.has(ref.path)) throw fail('not-found'); db.set(ref.path, applyPatch(db.get(ref.path), patch)); };
 export const deleteDoc = async (ref) => { db.delete(ref.path); };
-export const writeBatch = () => { const ops = []; return { delete: (r) => ops.push(r.path), commit: async () => ops.forEach((p) => db.delete(p)) }; };
+// Mirrors firestore.rules for the one thing that matters here: a users/{uid} document can only be created together with
+// claiming a valid invite (exists, uses < maxUses, email matches when bound, uses goes up by exactly one).
+export const writeBatch = () => {
+  const ops = [];
+  return {
+    delete: (r) => ops.push({ t: 'del', p: r.path }),
+    set: (r, d) => ops.push({ t: 'set', p: r.path, d }),
+    update: (r, d) => ops.push({ t: 'upd', p: r.path, d }),
+    commit: async () => {
+      for (const o of ops) {
+        if (o.t === 'set' && /^users\/[^/]+$/.test(o.p) && o.d.invite !== undefined) {
+          const inv = db.get(`invites/${o.d.invite}`); const claim = ops.find((x) => x.t === 'upd' && x.p === `invites/${o.d.invite}`);
+          const email = A.currentUser?.email?.toLowerCase();
+          const ok = inv && claim && inv.uses < inv.maxUses && claim.d.uses?.__inc === 1 && (!inv.email || inv.email.toLowerCase() === email) && o.d.email.toLowerCase() === email;
+          if (!ok) throw fail('permission-denied');
+        }
+      }
+      for (const o of ops) {
+        if (o.t === 'del') db.delete(o.p); else if (o.t === 'set') db.set(o.p, structuredClone(o.d)); else db.set(o.p, applyPatch(db.get(o.p) || {}, o.d));
+      }
+    },
+  };
+};

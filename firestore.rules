@@ -8,20 +8,47 @@ service cloud.firestore {
     function isAdmin() { return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
     match /admins/{uid} { allow read: if owner(uid); allow write: if false; }
 
+    // Signed up = has a users/{uid} document. That document can only be created together with claiming a valid invite (see below),
+    // so an Auth account without one cannot store or read anything.
+    function registered(uid) { return exists(/databases/$(database)/documents/users/$(uid)); }
+    function invitePath(code) { return /databases/$(database)/documents/invites/$(code); }
+    function emailOk(inv) { return inv.get('email', '') == '' || inv.email.lower() == request.auth.token.email.lower(); }
+
+    // invites/{code}: { email?: string (lowercase; if set only that address may use it), maxUses: number, uses: number, createdAt }
+    // Created and deleted by the owner only. A new user claims one use in the SAME batch that creates their users document.
+    match /invites/{code} {
+      allow read, create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        request.auth != null && !registered(request.auth.uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['uses'])
+        && request.resource.data.uses == resource.data.uses + 1
+        && resource.data.uses < resource.data.maxUses
+        && emailOk(resource.data)
+        && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.invite == code);
+    }
+
     match /users/{uid} {
       allow read: if owner(uid) || isAdmin();
-      allow create, update: if owner(uid) && request.resource.data.keys().hasOnly(['name', 'email', 'createdAt']);
+      allow create: if owner(uid) && !registered(uid)
+        && request.resource.data.keys().hasOnly(['name', 'email', 'createdAt', 'invite'])
+        && request.resource.data.invite is string
+        && request.resource.data.email.lower() == request.auth.token.email.lower()
+        && emailOk(get(invitePath(request.resource.data.invite)).data)
+        && get(invitePath(request.resource.data.invite)).data.uses < get(invitePath(request.resource.data.invite)).data.maxUses
+        && getAfter(invitePath(request.resource.data.invite)).data.uses == get(invitePath(request.resource.data.invite)).data.uses + 1;
+      allow update: if owner(uid) && request.resource.data.keys().hasOnly(['name', 'email', 'createdAt', 'invite'])
+        && request.resource.data.get('invite', null) == resource.data.get('invite', null);
       allow delete: if false;
 
       match /profiles/{pid} {
         allow read: if owner(uid);
-        allow create, update: if owner(uid)
+        allow create, update: if owner(uid) && registered(uid)
           && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 24
           && request.resource.data.kids is bool;
         allow delete: if owner(uid);
 
-        match /progress/{itemId} { allow read, write: if owner(uid); }
-        match /list/{itemId} { allow read, write: if owner(uid); }
+        match /progress/{itemId} { allow read: if owner(uid); allow write: if owner(uid) && registered(uid); }
+        match /list/{itemId} { allow read: if owner(uid); allow write: if owner(uid) && registered(uid); }
       }
     }
     match /{document=**} { allow read, write: if false; }

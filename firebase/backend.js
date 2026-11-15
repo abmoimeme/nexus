@@ -122,6 +122,10 @@ function home(prof) {
 }
 
 const validAvatar = (a) => (Number.isInteger(a) && a >= 0 && a < AVATAR_COUNT ? a : 0);
+const BAD_INVITE = 'That invite code is not valid for this email, or it has already been used.';
+const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+const newCode = () => 'NX-' + [...crypto.getRandomValues(new Uint8Array(12))].map((b) => CODE_CHARS[b % CODE_CHARS.length]).join('');
+
 const cleanName = (n) => String(n ?? '').trim().slice(0, 24);
 
 /* ---------- Routes ---------- */
@@ -132,14 +136,28 @@ async function route(method, path, q, body) {
     const u = auth.currentUser; let profile = null;
     if (u) { const pid = sess(`nexus_p_${u.uid}`); if (pid) profile = await getProfile(u, pid).then((p) => pub(pid, p)).catch(() => null); }
     return { user: u ? { id: u.uid, name: u.displayName || (u.email || '').split('@')[0], email: u.email, isAdmin: await isOwner(u) } : null, profile,
-      setupNeeded: false, signupOpen: true, canReset: true, hosted: true, avatars: AVATARS, maxProfiles: MAX_PROFILES };
+      setupNeeded: false, signupOpen: true, inviteRequired: true, canReset: true, hosted: true, avatars: AVATARS, maxProfiles: MAX_PROFILES };
   }
   if (path === '/api/auth/register') {
     const name = String(body.name || '').trim().slice(0, 60); const email = String(body.email || '').trim();
     if (String(body.password || '').length < 8) throw new HttpError(400, 'Choose a password of at least 8 characters');
+    const code = String(body.invite || '').trim().toUpperCase();
+    if (!code) throw new HttpError(400, 'Enter your invite code');
+    if (!/^[A-Z0-9-]{4,40}$/.test(code)) throw new HttpError(403, BAD_INVITE);
     const cred = await sdk.createUserWithEmailAndPassword(auth, email, String(body.password));
+    try {
+      // One atomic write: create my account record AND use up one use of the invite. The rules reject it unless the code exists,
+      // has uses left and (if it was made for one email) matches the email I just signed up with.
+      const batch = sdk.writeBatch(db);
+      batch.set(uref(cred.user), { name: name || email.split('@')[0], email, createdAt: Date.now(), invite: code });
+      batch.update(sdk.doc(db, 'invites', code), { uses: sdk.increment(1) });
+      await batch.commit();
+    } catch (e) {
+      await cred.user.delete().catch(() => {});   // undo the sign-up so a bad code leaves nothing behind
+      if (e?.code === 'permission-denied' || e?.code === 'not-found') throw new HttpError(403, BAD_INVITE);
+      throw e;
+    }
     await sdk.updateProfile(cred.user, { displayName: name || email.split('@')[0] });
-    await sdk.setDoc(uref(cred.user), { name: name || email.split('@')[0], email, createdAt: Date.now() });
     await sdk.setDoc(pdoc(cred.user, Date.now()), { name: (name || 'Me').split(' ')[0].slice(0, 24), avatar: 0, kids: false, createdAt: Date.now() });
     return { ok: true };
   }
@@ -252,6 +270,19 @@ async function route(method, path, q, body) {
     const c = await load(need()); P.progress.delete(Number(m[1]));
     await sdk.deleteDoc(sdk.doc(db, 'users', c.u.uid, 'profiles', c.pid, 'progress', m[1])); return { ok: true };
   }
+  if (path === '/api/invites' && method === 'GET') {
+    await needAdmin(); const snap = await sdk.getDocs(sdk.collection(db, 'invites'));
+    return { invites: snap.docs.map((d) => ({ code: d.id, ...d.data() })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)) };
+  }
+  if (path === '/api/invites' && method === 'POST') {
+    await needAdmin();
+    const email = String(body.email || '').trim().toLowerCase();
+    if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new HttpError(400, 'That email address does not look right');
+    const maxUses = email ? 1 : Math.min(500, Math.max(1, Math.floor(Number(body.maxUses) || 1)));
+    const code = newCode(); const inv = { email, maxUses, uses: 0, createdAt: Date.now() };
+    await sdk.setDoc(sdk.doc(db, 'invites', code), inv); return { code, ...inv };
+  }
+  if ((m = /^\/api\/invites\/([A-Z0-9-]+)$/.exec(path)) && method === 'DELETE') { await needAdmin(); await sdk.deleteDoc(sdk.doc(db, 'invites', m[1])); return { ok: true }; }
   if (path === '/api/sources') { await needAdmin(); return { sources: [] }; }
   if (path === '/api/settings') { await needAdmin(); return { openSignup: true }; }
   if (path === '/api/users') {

@@ -40,8 +40,10 @@ const post = (p, b = {}) => call('POST', p, b);
 
 test.beforeEach(() => { fake.resetFake(); store.clear(); });
 
-async function signUp(email = 'a@b.co', name = 'Abdoul Samb') {
-  const r = await post('/api/auth/register', { name, email, password: 'secret-pass-1' }); assert.equal(r.status, 200, r.error); return r;
+const seedInvite = (code = 'TEST-CODE', inv = {}) => fake.db.set(`invites/${code}`, { email: '', maxUses: 100, uses: 0, createdAt: 1, ...inv });
+async function signUp(email = 'a@b.co', name = 'Abdoul Samb', invite = 'TEST-CODE') {
+  if (!fake.db.has(`invites/${invite}`)) seedInvite(invite);
+  const r = await post('/api/auth/register', { name, email, password: 'secret-pass-1', invite }); assert.equal(r.status, 200, r.error); return r;
 }
 async function pick(name) { const { profiles } = await get('/api/profiles'); const p = profiles.find((x) => x.name === name); const r = await post(`/api/profiles/${p.id}/select`); assert.equal(r.status, 200, r.error); return p; }
 
@@ -58,7 +60,7 @@ test('register creates the account and a first profile; wrong password and dupli
   await post('/api/auth/logout');
   assert.equal((await get('/api/session')).user, null);
   assert.equal((await post('/api/auth/login', { email: 'a@b.co', password: 'nope' })).status, 401);
-  assert.equal((await post('/api/auth/register', { name: 'X', email: 'a@b.co', password: 'secret-pass-1' })).status, 409);
+  assert.equal((await post('/api/auth/register', { name: 'X', email: 'a@b.co', password: 'secret-pass-1', invite: 'TEST-CODE' })).status, 409);
   assert.equal((await post('/api/auth/register', { name: 'X', email: 'c@d.co', password: 'short' })).status, 400);
   assert.equal((await post('/api/auth/login', { email: 'a@b.co', password: 'secret-pass-1' })).status, 200);
 });
@@ -189,4 +191,42 @@ test('owner access comes only from an admins/{uid} document; owners can list peo
 test('unknown routes are cleanly unavailable', async () => {
   await signUp(); await pick('Abdoul');
   const r = await post('/api/sources/plex/pin'); assert.equal(r.status, 404); assert.match(r.error, /no media-server admin/);
+});
+
+test('sign-up needs a valid invite; a bad one leaves no account behind', async () => {
+  const reg = (b) => post('/api/auth/register', { name: 'N', email: 'new@x.co', password: 'secret-pass-1', ...b });
+  assert.equal((await get('/api/session')).inviteRequired, true);
+  assert.equal((await reg({})).status, 400);
+  const bad = await reg({ invite: 'nx-nope' }); assert.equal(bad.status, 403); assert.match(bad.error, /invite code is not valid/);
+  assert.equal(fake.users.has('new@x.co'), false); assert.deepEqual(fake.fakeDeleted, ['new@x.co']);
+  assert.equal([...fake.db.keys()].some((k) => k.startsWith('users/')), false);
+  seedInvite('NX-GOOD', { maxUses: 1 });
+  assert.equal((await reg({ invite: ' nx-good ' })).status, 200);
+  assert.equal(fake.db.get('invites/NX-GOOD').uses, 1);
+  await post('/api/auth/logout');
+  const again = await post('/api/auth/register', { name: 'Two', email: 'two@x.co', password: 'secret-pass-1', invite: 'NX-GOOD' });
+  assert.equal(again.status, 403); assert.equal(fake.users.has('two@x.co'), false);
+});
+
+test('an invite made for one email works only for that email (any letter case)', async () => {
+  seedInvite('NX-MINE', { email: 'mom@x.co', maxUses: 1 });
+  const other = await post('/api/auth/register', { name: 'Eve', email: 'eve@x.co', password: 'secret-pass-1', invite: 'NX-MINE' });
+  assert.equal(other.status, 403); assert.equal(fake.db.get('invites/NX-MINE').uses, 0);
+  const mom = await post('/api/auth/register', { name: 'Mom', email: 'Mom@X.co', password: 'secret-pass-1', invite: 'NX-MINE' });
+  assert.equal(mom.status, 200, mom.error);
+});
+
+test('the owner can create, list and delete invites; others cannot', async () => {
+  await signUp('owner@x.co', 'Owner'); assert.equal((await get('/api/invites')).status, 403);
+  fake.db.set(`admins/${(await get('/api/session')).user.id}`, { role: 'owner' });
+  const bound = await post('/api/invites', { email: ' Dad@X.co ', maxUses: 9 });
+  assert.equal(bound.status, 200); assert.match(bound.code, /^NX-[A-Z2-9]{12}$/); assert.equal(bound.email, 'dad@x.co'); assert.equal(bound.maxUses, 1);
+  const shared = await post('/api/invites', { maxUses: 5 }); assert.equal(shared.maxUses, 5); assert.notEqual(shared.code, bound.code);
+  assert.equal((await post('/api/invites', { email: 'nope' })).status, 400);
+  assert.equal((await get('/api/invites')).invites.length, 3);
+  assert.equal((await call('DELETE', `/api/invites/${shared.code}`)).status, 200);
+  assert.equal((await get('/api/invites')).invites.some((v) => v.code === shared.code), false);
+  await post('/api/auth/logout');
+  const dad = await post('/api/auth/register', { name: 'Dad', email: 'dad@x.co', password: 'secret-pass-1', invite: bound.code });
+  assert.equal(dad.status, 200, dad.error);
 });

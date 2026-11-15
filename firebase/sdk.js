@@ -4,4 +4,4 @@ export {
   getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail,
   updateProfile, reauthenticateWithCredential, EmailAuthProvider, updatePassword,
 } from 'firebase/auth';
-export { getFirestore, doc, collection, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+export { getFirestore, doc, collection, getDoc, getDocs, setDoc, updateDoc, deleteDoc, writeBatch, increment } from 'firebase/firestore';

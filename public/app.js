@@ -82,10 +82,11 @@ function renderAuth(mode) {
     <div class="card" style="margin-top:26px">
       ${s.setupNeeded ? '' : `<div class="tabs"><button data-act="authtab" data-m="login" class="${reg ? '' : 'on'}">Sign in</button>${s.signupOpen ? `<button data-act="authtab" data-m="register" class="${reg ? 'on' : ''}">Create account</button>` : ''}</div>`}
       <h1>${s.setupNeeded ? 'Welcome — set up NEXUS' : reg ? 'Create your account' : 'Welcome back'}</h1>
-      <p class="sub">${s.setupNeeded ? 'Create the owner account. You will connect your media servers next.' : reg ? 'Then pick a profile and start watching.' : 'Sign in to continue watching.'}</p>
+      <p class="sub">${s.setupNeeded ? 'Create the owner account. You will connect your media servers next.' : reg ? (s.inviteRequired ? 'NEXUS is invite-only. Use the email your invite was sent to.' : 'Then pick a profile and start watching.') : 'Sign in to continue watching.'}</p>
       <form data-form="${reg ? 'register' : 'login'}" autocomplete="on">
         ${reg ? '<label class="field"><span>Your name</span><input name="name" required maxlength="60" autocomplete="name"></label>' : ''}
         <label class="field"><span>Email</span><input name="email" type="email" required autocomplete="email"></label>
+        ${reg && s.inviteRequired ? `<label class="field"><span>Invite code</span><input name="invite" required maxlength="40" autocomplete="off" autocapitalize="characters" spellcheck="false" value="${esc(new URLSearchParams(location.search).get('invite') || '')}"></label>` : ''}
         <label class="field"><span>Password${reg ? ' (8+ characters)' : ''}</span><input name="password" type="password" required minlength="${reg ? 8 : 1}" autocomplete="${reg ? 'new-password' : 'current-password'}"></label>
         <div class="err" id="autherr" role="alert"></div>
         <button class="btn btn-primary" style="width:100%" type="submit">${reg ? 'Create account' : 'Sign in'}</button>
@@ -582,8 +583,11 @@ const ICON = { plex: '▶', archive: '🏛', direct: '🔗' };
 
 async function viewSources() {
   const main = $('#main');
-  let src, st, users;
-  try { [{ sources: src }, st, { users }] = await Promise.all([api('/api/sources'), api('/api/settings'), api('/api/users')]); } catch (e) { return fail(e); }
+  let src, st, users, invites = null;
+  try {
+    [{ sources: src }, st, { users }] = await Promise.all([api('/api/sources'), api('/api/settings'), api('/api/users')]);
+    if (S.session.hosted) ({ invites } = await api('/api/invites'));
+  } catch (e) { return fail(e); }
   if (S.route !== 'sources') return;
   main.innerHTML = `<div class="panel"><h1>Libraries &amp; sources</h1>
     <p class="sub">Everything here feeds your NEXUS library. Plex streams are relayed by this server, so your Plex token never reaches a browser.</p>
@@ -598,8 +602,23 @@ async function viewSources() {
       <button class="addcard" data-act="addlink"><div class="ic">🔗</div><b>Video link</b><span>Add a single title from an MP4, WebM or HLS (.m3u8) URL you are allowed to stream.</span></button></div></div>`}
     <div class="sect"><h3>Access</h3>${S.session.hosted ? '' : `<label class="switch"><span>Allow others to create accounts<br><small class="hint">Off by default. Turn on briefly to let family or testers sign up, then switch it off.</small></span><input type="checkbox" data-change="signup" ${st.openSignup ? 'checked' : ''}></label>`}
       <h3 style="margin-top:18px">People with an account</h3>
-      ${users.map((u) => `<div class="src"><div class="ic">👤</div><div class="i"><b>${esc(u.name)}</b><span>${esc(u.email)}${u.isAdmin ? ' · Owner' : ''}</span></div>${u.id !== S.session.user.id ? `<button class="btn btn-ghost btn-sm" data-act="resetpw" data-id="${u.id}" data-name="${esc(u.name)}">${S.session.hosted ? 'Email reset link' : 'Reset password'}</button>` : ''}</div>`).join('')}</div></div>`;
+      ${users.map((u) => `<div class="src"><div class="ic">👤</div><div class="i"><b>${esc(u.name)}</b><span>${esc(u.email)}${u.isAdmin ? ' · Owner' : ''}</span></div>${u.id !== S.session.user.id ? `<button class="btn btn-ghost btn-sm" data-act="resetpw" data-id="${u.id}" data-name="${esc(u.name)}">${S.session.hosted ? 'Email reset link' : 'Reset password'}</button>` : ''}</div>`).join('')}
+      ${invites ? inviteSection(invites) : ''}</div></div>`;
   if (src.some((s) => s.status === 'syncing')) S.poll = setInterval(() => { if (S.route === 'sources' && !modalRoot.innerHTML) viewSources(); }, 3000);
+}
+
+const inviteLink = (code) => `${location.origin}/?invite=${encodeURIComponent(code)}`;
+function inviteSection(list) {
+  return `<h3 style="margin-top:22px">Invites</h3>
+    <p class="hint">NEXUS is invite-only. Make a code for one person's email, or a code several people can share. Send them the link and they sign up with the same email.</p>
+    <form data-form="newinvite" class="src" style="gap:10px;flex-wrap:wrap">
+      <input name="email" type="email" placeholder="Their email (optional)" style="flex:1;min-width:180px">
+      <input name="maxUses" type="number" min="1" max="500" value="1" title="How many people can use it (ignored when an email is set)" style="width:70px">
+      <button class="btn btn-primary btn-sm" type="submit">Create invite</button></form>
+    <div class="err" id="perr" role="alert"></div>
+    ${list.map((v) => `<div class="src"><div class="ic">✉</div><div class="i"><b>${esc(v.code)}</b><span>${v.email ? esc(v.email) : 'Any email'} · ${v.uses}/${v.maxUses} used</span></div>
+      <button class="btn btn-ghost btn-sm" data-act="copyinvite" data-code="${esc(v.code)}">Copy link</button>
+      <button class="btn btn-danger btn-sm" data-act="rminvite" data-code="${esc(v.code)}">Delete</button></div>`).join('') || '<p class="hint">No invites yet.</p>'}`;
 }
 
 function plexModal() {
@@ -734,6 +753,8 @@ const A = {
       $('#tmp').select();
     } catch (e) { fail(e); }
   },
+  copyinvite: async (el) => toast((await copyText(inviteLink(el.dataset.code))) ? 'Invite link copied' : 'Could not copy automatically'),
+  rminvite: async (el) => { if (!confirm(`Delete invite ${el.dataset.code}? Nobody will be able to use it.`)) return; try { await api(`/api/invites/${encodeURIComponent(el.dataset.code)}`, { method: 'DELETE' }); viewSources(); } catch (e) { fail(e); } },
   copytmp: async () => toast((await copyText($('#tmp').value)) ? 'Copied' : 'Could not copy automatically'),
   closeplayer: closePlayer,
   plower: () => startPlayback(P.itemId, P.info.epKey, { mode: 'hls', kbps: 2000, startMs: (P.video?.currentTime || 0) * 1000 }),
@@ -777,6 +798,7 @@ document.addEventListener('submit', async (e) => {
   const btn = $('button[type=submit]', f);
   try {
     if (kind === 'login' || kind === 'register') return submitAuth(f, kind);
+    if (kind === 'newinvite') { const r = await api('/api/invites', { method: 'POST', body: { email: val('email'), maxUses: Number(val('maxUses')) } }); await copyText(inviteLink(r.code)); toast('Invite created. The link is copied.'); return viewSources(); }
     if (kind === 'pin') return pickProfile(f.dataset.id, val('pin'));
     if (kind === 'profile') return saveProfile(f);
     if (kind === 'chpw') {
