@@ -4,4 +4,3 @@ node_modules/
 *.log
 hosting/
 demo/nexus-demo.html
-catalog/archive.json

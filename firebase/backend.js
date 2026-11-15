@@ -244,6 +244,7 @@ async function route(method, path, q, body) {
   }
   if ((m = /^\/api\/items\/(\d+)\/play$/.exec(path))) {
     const c = await load(need()); const it = visible(c.prof).find((i) => i.id === +m[1]); if (!it) throw new HttpError(404, 'Title not found');
+    if (it.private) throw new HttpError(403, 'This title plays on the private NEXUS server, not on the public site.');
     const ep = q.get('ep') || ''; let label = null; let title = it.title; let url = it.streamUrl || '/clip.mp4'; let durationMs = (it.durationMin ? it.durationMin * 60000 : 8000);
     if (it.kind === 'show') {
       const e = it.seasons.flatMap((s) => s.episodes).find((x) => x.key === ep); if (!e) throw new HttpError(400, 'Choose an episode');

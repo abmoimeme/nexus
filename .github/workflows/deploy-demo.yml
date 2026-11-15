@@ -8,7 +8,7 @@ on:
     - cron: '17 9 * * 1'   # refresh the film list weekly
   push:
     branches: [main]
-    paths: ['public/**', 'demo/**', 'scripts/**', 'firebase/**', 'firebase.json', 'package.json']
+    paths: ['public/**', 'demo/**', 'catalog/**', 'scripts/**', 'firebase/**', 'firebase.json', 'package.json']
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -18,10 +18,6 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
-      # Internet Archive classics are switched off for now (the site shows the built-in sample titles). To bring them back,
-      # uncomment these two lines; a failed import is skipped and the sample titles stay.
-      # - run: npm run import:archive
-      #   continue-on-error: true
       - run: npm run build:site
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:

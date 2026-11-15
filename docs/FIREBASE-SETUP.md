@@ -15,7 +15,7 @@ Until step 1 is done the site automatically shows that demo.
 
 ## What is and is not in this build
 - Titles come from `catalog.json` (sample titles) and play the built-in clip. A catalog entry can carry `streamUrl` (mp4 or m3u8) to play real files.
-- Plex, Internet Archive import and the owner admin screens need the Node server (see README); they report "not available" here.
+- Plex and the owner admin screens need the Node server (see README); they report "not available" here.
 - Kids profiles and PINs are household controls enforced in the app, not a defence against the account owner, who can change them with the account password.
 
 ## Owner / admin access
@@ -25,12 +25,10 @@ The owner is whoever has a document `admins/{their uid}` in Firestore (no client
 3. Reload NEXUS. The "Libraries & sources" page now lists everyone with an account and can email them a password-reset link.
 Re-publish the rules after pulling updates: `npx firebase-tools deploy --only firestore:rules --project nexus-9f372`.
 
-## Real films from the Internet Archive
-When enabled in the deploy workflow (currently switched off, so the site shows the sample titles), each deploy runs `npm run import:archive`, which pulls ~80 of the most-downloaded free feature films from archive.org into the catalog
-(they stream straight from archive.org). If archive.org is unreachable the step is skipped and the previous titles stay. A weekly scheduled run refreshes the list.
-- Change the list with `ARCHIVE_QUERY` / `ARCHIVE_LIMIT` (see `scripts/import-archive.mjs`).
-- Archive films are unrated, so Kids profiles do not show them.
-- The fictional sample titles remain at `/demo.html`.
+## Showing your Plex library on the public site
+On the machine that runs NEXUS (connected to Plex, library synced): `npm run cli -- export-catalog`. It writes `catalog/plex.json` and posters to
+`catalog/art/`. Commit and push those; the next deploy shows those titles. The public site lists them but cannot play them: Play says it
+runs on the private server. Run the command again whenever the library changes.
 
 ## Invite-only sign-up
 

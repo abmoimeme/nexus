@@ -9,11 +9,10 @@
   },
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning server/index.js",
-    "test": "node --disable-warning=ExperimentalWarning --test tests/e2e.test.js tests/firebase.test.js tests/archive-import.test.js",
+    "test": "node --disable-warning=ExperimentalWarning --test tests/e2e.test.js tests/firebase.test.js tests/export-catalog.test.js",
     "cli": "node --disable-warning=ExperimentalWarning server/cli.js",
     "build:demo": "node scripts/build-demo.mjs && mkdir -p hosting && cp demo/nexus-demo.html hosting/index.html",
-    "build:site": "node scripts/build-demo.mjs && node scripts/build-firebase.mjs && cp demo/nexus-demo.html hosting/demo.html",
-    "import:archive": "node --disable-warning=ExperimentalWarning scripts/import-archive.mjs"
+    "build:site": "node scripts/build-demo.mjs && node scripts/build-firebase.mjs && cp demo/nexus-demo.html hosting/demo.html"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",
