@@ -24,7 +24,7 @@ globalThis.window = globalThis;
 globalThis.fetch = async (u) => {
   const p = new URL(u, 'https://nexus.test').pathname;
   if (p === '/__/firebase/init.json') return new Response(JSON.stringify({ projectId: 'x', apiKey: 'k' }));
-  if (p === '/catalog.json') return new Response(JSON.stringify({ avatars: AVATARS, items: items.map((i, n) => (n === 0 ? { ...i, private: true } : i)) }));
+  if (p === '/catalog.json') return new Response(JSON.stringify({ avatars: AVATARS, items: items.map((i, n) => (n === items.length - 1 ? { ...i, private: true } : i)) }));
   throw new Error(`unexpected fetch ${p}`);
 };
 await import(bundle);
@@ -233,6 +233,6 @@ test('the owner can create, list and delete invites; others cannot', async () =>
 
 test('titles exported from Plex are listed but cannot be played on the public site', async () => {
   await signUp(); await pick('Abdoul');
-  const r = await get(`/api/items/${items[0].id}/play`); assert.equal(r.status, 403); assert.match(r.error, /private NEXUS server/);
+  const r = await get(`/api/items/${items[items.length - 1].id}/play`); assert.equal(r.status, 403); assert.match(r.error, /private NEXUS server/);
   assert.equal((await get(`/api/items/${items[1].id}/play`)).status, 200);
 });
