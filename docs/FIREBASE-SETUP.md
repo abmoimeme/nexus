@@ -26,7 +26,7 @@ The owner is whoever has a document `admins/{their uid}` in Firestore (no client
 Re-publish the rules after pulling updates: `npx firebase-tools deploy --only firestore:rules --project nexus-9f372`.
 
 ## Real films from the Internet Archive
-Each deploy runs `npm run import:archive`, which pulls ~80 of the most-downloaded free feature films from archive.org into the catalog
+When enabled in the deploy workflow (currently switched off, so the site shows the sample titles), each deploy runs `npm run import:archive`, which pulls ~80 of the most-downloaded free feature films from archive.org into the catalog
 (they stream straight from archive.org). If archive.org is unreachable the step is skipped and the previous titles stay. A weekly scheduled run refreshes the list.
 - Change the list with `ARCHIVE_QUERY` / `ARCHIVE_LIMIT` (see `scripts/import-archive.mjs`).
 - Archive films are unrated, so Kids profiles do not show them.

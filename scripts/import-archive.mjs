@@ -1,3 +1,4 @@
+// NOTE: the deploy workflow currently does NOT run this (classics are switched off); see .github/workflows/deploy-demo.yml.
 // Imports free feature films from the Internet Archive into catalog/archive.json (used by build-firebase.mjs).
 // Titles play straight from archive.org. Usage: npm run import:archive   (ARCHIVE_QUERY="western" ARCHIVE_LIMIT=60 optional)
 import fs from 'node:fs';
